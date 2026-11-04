@@ -1,0 +1,11 @@
+
+[templates."nautilus"]
+input_path = "templates/nautilus.css"
+output_path = "~/.local/share/themes/ClavisNiri/gtk-4.0/gtk.css"
+
+
+[templates."reversal-icons"]
+input_path = "templates/reversal-icons.json"
+output_path = "~/.local/share/clavis/reversal-icons/palette.json"
+post_hook = "@HOME@/.local/bin/clavis-reversal-icons"
+

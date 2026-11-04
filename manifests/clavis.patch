@@ -1,0 +1,408 @@
+diff --git a/Common/Fonts.qml b/Common/Fonts.qml
+index b744ea5..4fda031 100644
+--- a/Common/Fonts.qml
++++ b/Common/Fonts.qml
+@@ -7,8 +7,8 @@ Singleton {
+ 
+     // User-configurable family defaults. Keep all family literals in this
+     // singleton so components only depend on semantic roles.
+-    readonly property string defaultUi: "LXGW WenKai GB Screen"
+-    readonly property string defaultMono: "JetBrainsMono Nerd Font"
++    readonly property string defaultUi: "Noto Sans CJK SC"
++    readonly property string defaultMono: "JetBrains Mono"
+     readonly property string defaultNumeric: root.defaultMono
+     readonly property string bundledFamilyName: bundledFont.name || "Google Sans Flex"
+     // These preferences are deliberately separate from the effective family
+diff --git a/Common/functions/DisplayConfiguration.js b/Common/functions/DisplayConfiguration.js
+index a7c8a20..c4793d2 100644
+--- a/Common/functions/DisplayConfiguration.js
++++ b/Common/functions/DisplayConfiguration.js
+@@ -45,9 +45,7 @@ function rows(live, committed, collisions) {
+     return result;
+ }
+ function size(row) {
+-    const s=row.settings, live=row.live;
+-    if (live && s.mode===live.currentMode && s.scale===live.scale && s.transform===transform(live.transform) && live.logicalWidth>0)
+-        return {width:live.logicalWidth,height:live.logicalHeight};
++    const s=row.settings;
+     const dimensions=String(s.mode || "0x0").split("@")[0].split("x").map(Number);
+     const rotated=["90","270","flipped-90","flipped-270"].indexOf(s.transform)>=0;
+     const scale=Math.round((s.scale||1)*120)/120;
+diff --git a/Modules/Dock/DockFolderFan.qml b/Modules/Dock/DockFolderFan.qml
+index 975e479..beb6142 100644
+--- a/Modules/Dock/DockFolderFan.qml
++++ b/Modules/Dock/DockFolderFan.qml
+@@ -29,15 +29,15 @@ Item {
+     readonly property var tiles: {
+         const result = [openItem];
+         for (const child of view.contentItem.children)
+-            if (child.fileTile && child.visible)
+-                result.push(child.fileTile);
++        if (child.fileTile && child.visible)
++        result.push(child.fileTile);
+         return result;
+     }
+     readonly property var blurRegions: {
+         const result = [openBlur, actionBlur];
+         for (const child of view.contentItem.children)
+-            if (child.blurRegion && child.visible)
+-                result.push(child.blurRegion);
++        if (child.blurRegion && child.visible)
++        result.push(child.blurRegion);
+         return result;
+     }
+     implicitWidth: geometry.width
+@@ -70,7 +70,6 @@ Item {
+         displayMarginEnd: root.geometry.step * 3
+         cacheBuffer: 0
+         boundsBehavior: Flickable.StopAtBounds
+-        acceptedButtons: Qt.NoButton
+         interactive: root.progress === 1 && !DockService.fileDragActive
+         delegate: Item {
+             id: row
+diff --git a/Modules/Lock/CaelestiaLock.qml b/Modules/Lock/CaelestiaLock.qml
+index c2c4df4..4f5015c 100644
+--- a/Modules/Lock/CaelestiaLock.qml
++++ b/Modules/Lock/CaelestiaLock.qml
+@@ -2,6 +2,7 @@ import QtQuick
+ import QtQuick.Effects
+ import Quickshell.Wayland
+ import qs.Common
++import qs.Modules.Wallpaper
+ import qs.Services
+ 
+ Item {
+@@ -41,11 +42,12 @@ Item {
+         if (startupStarted || !snapshotResolved)
+             return;
+ 
+-        if (snapshotResult && snapshotImage.status !== Image.Ready && snapshotImage.status !== Image.Error)
++        if (wallpaperBackground.sourcePath !== "" && !wallpaperBackground.ready
++                && wallpaperBackground.imageStatus !== Image.Error)
+             return;
+ 
+-        if (snapshotResult && snapshotImage.status === Image.Error)
+-            console.warn("Unable to display pre-lock snapshot for output " + root.screen.name);
++        if (wallpaperBackground.sourcePath !== "" && wallpaperBackground.imageStatus === Image.Error)
++            console.warn("Unable to display lock wallpaper for output " + root.screen.name);
+ 
+         startupStarted = true;
+         startupAnim.start();
+@@ -78,24 +80,28 @@ Item {
+         color: Appearance.colors.colLayer0Base
+     }
+ 
+-    Image {
+-        id: snapshotImage
++    WallpaperImageViewport {
++        id: wallpaperBackground
+ 
+         anchors.fill: parent
+-        source: root.snapshotResult ? root.snapshotResult.url : ""
+-        fillMode: Image.Stretch
+-        asynchronous: false
+-        cache: true
+-        visible: source !== ""
++        sourcePath: root.screen ? WallpaperService.wallpaperForScreen(root.screen.name) : ""
++        imageFillMode: root.screen ? WallpaperService.qtFillMode(WallpaperService.fillModeForScreen(
++                                                                     root.screen.name)) :
++                                     Image.PreserveAspectCrop
++        panoramaEnabled: root.screen ? WallpaperService.fillModeForScreen(root.screen.name) === "panorama" :
++                                       false
++
+         layer.enabled: true
+-        onStatusChanged: root.maybeStartStartupAnimation()
++        onReadyChanged: root.maybeStartStartupAnimation()
++        onImageStatusChanged: root.maybeStartStartupAnimation()
+ 
+         layer.effect: MultiEffect {
+             autoPaddingEnabled: false
+             blurEnabled: true
+-            blur: root.backgroundBlur
++            blur: 0.82 + root.backgroundBlur * 0.18
+             blurMax: 64
+             blurMultiplier: 1
++            saturation: -0.12
+         }
+     }
+ 
+diff --git a/Modules/Lock/README.md b/Modules/Lock/README.md
+index 4724c98..ec82732 100644
+--- a/Modules/Lock/README.md
++++ b/Modules/Lock/README.md
+@@ -4,19 +4,21 @@ Settings Center → Theme → Lock screen selects `default` or `caelestia`.
+ The selection is saved as `theme.lockScreenStyle` in the personalization config.
+ Missing or invalid values use `default`; each lock session keeps its initial selection.
+ 
+-`CaelestiaLock.qml` preserves the original card layout. `DefaultLock.qml` reveals a
++`CaelestiaLock.qml` preserves the original card layout and renders the current
++wallpaper through a strong Qt Quick `MultiEffect` blur. `DefaultLock.qml` reveals a
+ blurred wallpaper over a frozen pre-lock desktop frame, with authentication UI
+ in `DefaultLockContent.qml`. Both styles share the session lock and PAM context.
+-The new style uses Qt Quick MultiEffect for blur and the circular reveal mask.
++The Caelestia style uses the wallpaper directly so application windows and desktop
++panels do not show through the lock screen. The default style keeps the snapshot
++underneath its wallpaper layer for the top-left disc reveal and exit fade.
+ Both styles capture through a short-lived Quickshell `ScreencopyView` config before
+ acquiring the session lock. No external screenshot program is required. The helper
+ uses a private temporary directory in XDG_RUNTIME_DIR (TMPDIR fallback) for a BMP.
+ It returns the local path and holds the file until the main shell releases its stdin
+ lease at unlock/cancellation. Main-shell Image preloading completes before requesting
+ the session lock; display Images reuse the same URL and decoded image cache.
+-There is no PNG/base64/data-URL round trip. Default keeps
+-the snapshot underneath its wallpaper layer for the top-left disc reveal and exit
+-fade. The wallpaper itself is still sourced from the current wallpaper image.
++There is no PNG/base64/data-URL round trip. The wallpaper itself is sourced from the
++current wallpaper image.
+ 
+ Manual visual checks in a graphical session:
+ 
+@@ -25,7 +27,8 @@ Manual visual checks in a graphical session:
+ - Verify 12-hour AM/PM and 24-hour clocks, and the date at midnight.
+ - Type, delete, submit an incorrect password, then authenticate successfully.
+ - Press Escape to clear input and restore the clock; click to reveal authentication.
+-- Verify entrance reveals the blurred wallpaper over the desktop snapshot without a black flash.
++- Verify the Caelestia style shows only the blurred wallpaper without a black flash.
++- Verify the default style reveals the blurred wallpaper over the desktop snapshot.
+ 
+ If capture fails or times out, locking still proceeds. Default shows the wallpaper
+ without a disc reveal or a fade to a missing snapshot. The main shell does not
+diff --git a/Modules/Sidebars/Dashboard/DrawerView.qml b/Modules/Sidebars/Dashboard/DrawerView.qml
+index 250e443..35d5db5 100644
+--- a/Modules/Sidebars/Dashboard/DrawerView.qml
++++ b/Modules/Sidebars/Dashboard/DrawerView.qml
+@@ -427,7 +427,6 @@ Item {
+             onContentHeightChanged: Qt.callLater(dashboardScroll.scrollBy, 0)
+             // Keep wheel/touchpad scrolling enabled without letting Flickable
+             // take the mouse gesture used to drag a card.
+-            acceptedButtons: Qt.NoButton
+             interactive: root.isForeground && root.draggingTileId.length === 0
+             showVerticalScrollBar: contentHeight > height + 1
+             activeFocusOnTab: contentHeight > height + 1
+@@ -435,30 +434,30 @@ Item {
+                                                               "Drawer grid; scrollable with draggable cards") :
+                                                           qsTr("Drawer grid with draggable cards")
+             Keys.onPressed: event => {
+-                if (root.draggingTileId.length > 0 && event.key === Qt.Key_Escape) {
+-                    root.cancelDrag();
+-                    event.accepted = true;
+-                    return;
+-                }
+-                if (dashboardScroll.contentHeight <= dashboardScroll.height + 1)
+-                    return;
+-
+-                if (event.key === Qt.Key_Up)
+-                    dashboardScroll.scrollBy(-64);
+-                else if (event.key === Qt.Key_Down)
+-                    dashboardScroll.scrollBy(64);
+-                else if (event.key === Qt.Key_PageUp)
+-                    dashboardScroll.scrollBy(-dashboardScroll.height * 0.8);
+-                else if (event.key === Qt.Key_PageDown)
+-                    dashboardScroll.scrollBy(dashboardScroll.height * 0.8);
+-                else if (event.key === Qt.Key_Home)
+-                    dashboardScroll.scrollBy(-dashboardScroll.contentHeight);
+-                else if (event.key === Qt.Key_End)
+-                    dashboardScroll.scrollBy(dashboardScroll.contentHeight);
+-                else
+-                    return;
+-                event.accepted = true;
+-            }
++                                if (root.draggingTileId.length > 0 && event.key === Qt.Key_Escape) {
++                                    root.cancelDrag();
++                                    event.accepted = true;
++                                    return;
++                                }
++                                if (dashboardScroll.contentHeight <= dashboardScroll.height + 1)
++                                return;
++
++                                if (event.key === Qt.Key_Up)
++                                dashboardScroll.scrollBy(-64);
++                                else if (event.key === Qt.Key_Down)
++                                dashboardScroll.scrollBy(64);
++                                else if (event.key === Qt.Key_PageUp)
++                                dashboardScroll.scrollBy(-dashboardScroll.height * 0.8);
++                                else if (event.key === Qt.Key_PageDown)
++                                dashboardScroll.scrollBy(dashboardScroll.height * 0.8);
++                                else if (event.key === Qt.Key_Home)
++                                dashboardScroll.scrollBy(-dashboardScroll.contentHeight);
++                                else if (event.key === Qt.Key_End)
++                                dashboardScroll.scrollBy(dashboardScroll.contentHeight);
++                                else
++                                return;
++                                event.accepted = true;
++                            }
+ 
+             MouseArea {
+                 id: backgroundDrag
+@@ -470,30 +469,38 @@ Item {
+                 property real pressY: 0
+                 property real initialScroll: 0
+                 onPressed: mouse => {
+-                    const point = dashboard.mapFromItem(backgroundDrag, mouse.x, mouse.y);
+-                    const overCard = root.tileDefinitions.some(definition => {
+-                        const placement = root.displayPlacement(definition.id);
+-                        const size = root.cardSize(definition.id);
+-                        return placement && point.x >= placement.x && point.y >= placement.y && point.x
+-                                < placement.x + size.width && point.y < placement.y + size.height;
+-                    });
+-                    if (overCard) {
+-                        mouse.accepted = false;
+-                        return;
+-                    }
+-                    pressY = mouse.y;
+-                    initialScroll = dashboardScroll.contentY;
+-                    dashboardScroll.cancelFlick();
+-                    dashboardScroll.manualDragging = true;
+-                }
++                               const point = dashboard.mapFromItem(backgroundDrag, mouse.x, mouse.y);
++                               const overCard = root.tileDefinitions.some(definition => {
++                                                                              const placement
++                                                                              = root.displayPlacement(
++                                                                                  definition.id);
++                                                                              const size = root.cardSize(
++                                                                                  definition.id);
++                                                                              return placement && point.x
++                                                                              >= placement.x && point.y
++                                                                              >= placement.y && point.x
++                                                                              < placement.x + size.width
++                                                                              && point.y < placement.y
++                                                                              + size.height;
++                                                                          });
++                               if (overCard) {
++                                   mouse.accepted = false;
++                                   return;
++                               }
++                               pressY = mouse.y;
++                               initialScroll = dashboardScroll.contentY;
++                               dashboardScroll.cancelFlick();
++                               dashboardScroll.manualDragging = true;
++                           }
+                 onPositionChanged: mouse => {
+-                    if (!pressed)
+-                        return;
+-                    const position = initialScroll + pressY - mouse.y;
+-                    const maximum = Math.max(0, dashboardScroll.contentHeight - dashboardScroll.height);
+-                    dashboardScroll.contentY = Math.max(0, Math.min(maximum, position));
+-                    dashboardScroll.manualPullDistance = Math.max(0, -position);
+-                }
++                                       if (!pressed)
++                                       return;
++                                       const position = initialScroll + pressY - mouse.y;
++                                       const maximum = Math.max(0, dashboardScroll.contentHeight
++                                                                - dashboardScroll.height);
++                                       dashboardScroll.contentY = Math.max(0, Math.min(maximum, position));
++                                       dashboardScroll.manualPullDistance = Math.max(0, -position);
++                                   }
+                 function finish() {
+                     dashboardScroll.manualDragging = false;
+                     dashboardScroll.manualPullDistance = 0;
+@@ -514,12 +521,12 @@ Item {
+                 height: root.gridContentHeight
+                 focus: root.draggingTileId.length > 0
+                 Keys.onEscapePressed: event => {
+-                    if (root.draggingTileId.length === 0)
+-                        return;
++                                          if (root.draggingTileId.length === 0)
++                                          return;
+ 
+-                    root.cancelDrag();
+-                    event.accepted = true;
+-                }
++                                          root.cancelDrag();
++                                          event.accepted = true;
++                                      }
+ 
+                 Loader {
+                     width: dashboard.width
+@@ -594,18 +601,18 @@ Item {
+                         z: dragging ? 30 : 1
+                         onDragStarted: (tileId, sourceItem, grabLocalX, grabLocalY, pointerLocalX,
+                                         pointerLocalY) => {
+-                                            return root.beginDrag(tileId, sourceItem, grabLocalX, grabLocalY,
+-                                                                  pointerLocalX, pointerLocalY);
+-                                        }
++                                           return root.beginDrag(tileId, sourceItem, grabLocalX, grabLocalY,
++                                                                 pointerLocalX, pointerLocalY);
++                                       }
+                         onDragMoved: (tileId, pointerLocalX, pointerLocalY) => {
+-                            return root.updateDrag(tileId, pointerLocalX, pointerLocalY);
+-                        }
++                                         return root.updateDrag(tileId, pointerLocalX, pointerLocalY);
++                                     }
+                         onDragFinished: tileId => {
+-                            return root.finishDrag(tileId);
+-                        }
++                                            return root.finishDrag(tileId);
++                                        }
+                         onDragCanceled: tileId => {
+-                            return root.cancelDrag(tileId);
+-                        }
++                                            return root.cancelDrag(tileId);
++                                        }
+                     }
+                 }
+             }
+diff --git a/tests/qml/tst_display_math.qml b/tests/qml/tst_display_math.qml
+index a35ab55..2347547 100644
+--- a/tests/qml/tst_display_math.qml
++++ b/tests/qml/tst_display_math.qml
+@@ -104,4 +104,59 @@ TestCase {
+         compare(Config.size(row).width, 810);
+         compare(Config.size(row).height, 1440);
+     }
++
++    function test_fractionalScalePlacementGeometry() {
++        const laptop = {
++            connected: true,
++            settings: {
++                enabled: true,
++                mode: "2880x1800@120.000",
++                scale: 1.75,
++                transform: "normal",
++                position: {
++                    x: 0,
++                    y: 0
++                }
++            },
++            live: {
++                currentMode: "2880x1800@120.000",
++                scale: 1.75,
++                transform: "Normal",
++                logicalWidth: 1645,
++                logicalHeight: 1028
++            }
++        };
++        const external = {
++            connected: true,
++            settings: {
++                enabled: true,
++                mode: "3840x2160@60.000",
++                scale: 1.5,
++                transform: "normal",
++                position: {
++                    x: 1646,
++                    y: 0
++                }
++            }
++        };
++        compare(Config.size(laptop), {
++                    width: 1646,
++                    height: 1029
++                });
++        compare(Config.validation([laptop, external]), "");
++        external.settings.position.x = 1645;
++        compare(Config.validation([laptop, external]), "overlap");
++        laptop.settings.mode = "1920x1080@60.000";
++        compare(Config.size(laptop), {
++                    width: 1098,
++                    height: 618
++                });
++        external.settings.position.x = 1098;
++        compare(Config.validation([laptop, external]), "");
++        laptop.settings.transform = "90";
++        compare(Config.size(laptop), {
++                    width: 618,
++                    height: 1098
++                });
++    }
+ }

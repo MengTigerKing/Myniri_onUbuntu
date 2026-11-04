@@ -1,0 +1,45 @@
+# Clavis Matugen extended ANSI colors (248-255 and 232-239).
+# The prompt follows Kitty's generated palette without rewriting this file.
+add_newline = true
+command_timeout = 800
+format = "$os$directory$git_branch$git_status$python$cmd_duration$line_break$character"
+
+[os]
+disabled = false
+format = "[](fg:254)[$symbol](fg:233 bg:254)[](fg:254) "
+[os.symbols]
+Ubuntu = "  "
+Linux = "  "
+
+[directory]
+style = "fg:232 bg:255"
+format = "[](fg:255)[ $path$read_only ]($style)[](fg:255) "
+truncation_length = 3
+truncate_to_repo = true
+read_only = " "
+
+[git_branch]
+symbol = " "
+style = "fg:234 bg:253"
+format = "[](fg:253)[ $symbol$branch ]($style)[](fg:253) "
+
+[git_status]
+style = "fg:252"
+format = '([$all_status$ahead_behind]($style) )'
+
+[python]
+symbol = " "
+style = "fg:236 bg:251"
+format = '[](fg:251)[ $symbol$virtualenv ]($style)[](fg:251) '
+detect_extensions = []
+detect_files = []
+detect_folders = []
+
+[cmd_duration]
+min_time = 1500
+style = "fg:250"
+format = "[took $duration]($style) "
+
+[character]
+success_symbol = "[❯](bold 254)"
+error_symbol = "[❯](bold 248)"

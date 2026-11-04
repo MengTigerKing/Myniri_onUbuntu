@@ -1,0 +1,3 @@
+#!/bin/sh
+set -eu
+exec @HOME@/Applications/clavis/bin/qs -c clavis --no-duplicate

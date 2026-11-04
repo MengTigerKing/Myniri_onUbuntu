@@ -1,0 +1,190 @@
+#!/usr/bin/python3
+"""Build Reversal folder and file icons from the active Clavis palette."""
+
+import colorsys
+import configparser
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tempfile
+import xml.etree.ElementTree as ET
+
+
+HOME = Path.home()
+DATA = Path(os.environ.get("XDG_DATA_HOME", HOME / ".local/share"))
+CONFIG = Path(os.environ.get("CLAVIS_CONFIG_HOME", HOME / ".config/clavis"))
+STATE = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "clavis/reversal-icons"
+ICONS = DATA / "icons"
+SOURCE = ICONS / "Reversal-red-dark"
+PALETTE = DATA / "clavis/reversal-icons/palette.json"
+THEMES = ("ClavisReversal", "ClavisReversal-Alt")
+COLOR_PROPERTIES = {"color", "fill", "stroke", "stop-color", "flood-color", "lighting-color"}
+CSS_COLOR = re.compile(r"((?:color|fill|stroke|stop-color)\s*:\s*)(#[0-9a-fA-F]{3,8}\b|white\b|black\b)")
+
+ET.register_namespace("", "http://www.w3.org/2000/svg")
+ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+
+
+def rgb(value):
+    value = value.lstrip("#")
+    if len(value) in (3, 4):
+        value = "".join(c * 2 for c in value)
+    return tuple(int(value[i:i + 2], 16) / 255 for i in (0, 2, 4))
+
+
+def blend(a, b, amount):
+    left, right = rgb(a), rgb(b)
+    return "#" + "".join(f"{round((x + (y - x) * amount) * 255):02x}" for x, y in zip(left, right))
+
+
+def recolor_svg(source, category, small, palette):
+    root = ET.fromstring(source.read_bytes())
+
+    def color(value):
+        original = value.strip().lower()
+        raw = {"white": "#ffffff", "black": "#000000"}.get(original, original)
+        if not re.fullmatch(r"#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})", raw):
+            return value
+        hue, saturation, brightness = colorsys.rgb_to_hsv(*rgb(raw))
+        if small:
+            result = palette["on_surface"]
+        elif raw in ("#000", "#000000"):
+            # Keep the original drop shadows and outlines.
+            return value
+        elif raw in ("#fff", "#ffffff"):
+            result = palette["on_primary"]
+        elif category == "places" and raw == "#fafafa":
+            result = palette["primary_fixed"]
+        elif category == "places" and raw in ("#f05050", "#c84641"):
+            result = palette["primary" if raw == "#f05050" else "primary_container"]
+        elif saturation < 0.16:
+            if brightness > 0.88:
+                result = palette["primary_fixed"]
+            elif brightness < 0.28:
+                result = palette["on_primary_fixed"]
+            else:
+                result = blend(palette["on_primary_fixed"], palette["primary_fixed"], brightness)
+        else:
+            role = "primary" if category == "places" or hue < 0.13 or hue > 0.90 else (
+                "tertiary" if hue < 0.48 else "secondary")
+            result = blend(palette[role + "_container"], palette[role], min(1, max(0, (brightness - 0.2) / 0.8)))
+        if len(raw) == 9:
+            result += raw[-2:]
+        elif len(raw) == 5:
+            result += raw[-1] * 2
+        return result
+
+    def css(text):
+        return CSS_COLOR.sub(lambda match: match[1] + color(match[2]), text)
+
+    for element in root.iter():
+        for name, value in list(element.attrib.items()):
+            if name in COLOR_PROPERTIES:
+                element.set(name, color(value))
+            elif name == "style":
+                element.set(name, css(value))
+        if element.tag == "{http://www.w3.org/2000/svg}style" and element.text:
+            element.text = css(element.text)
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def make_theme(destination, palette):
+    originals = {}
+    count = 0
+    for category in ("places", "mimes"):
+        for directory, _, filenames in os.walk(SOURCE / category, followlinks=True):
+            for filename in sorted(filenames):
+                if not filename.endswith(".svg"):
+                    continue
+                source = Path(directory) / filename
+                if not source.is_file():
+                    continue
+                relative = source.relative_to(SOURCE)
+                small = "symbolic" in relative.parts or relative.parts[1] in ("16", "22", "24")
+                key = (source.resolve(), category, small)
+                target = destination / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if key in originals:
+                    os.link(originals[key], target)
+                else:
+                    target.write_bytes(recolor_svg(source, category, small, palette))
+                    originals[key] = target
+                count += 1
+        (destination / (category + "@2x")).symlink_to(category, target_is_directory=True)
+
+    index = configparser.RawConfigParser(strict=False)
+    index.optionxform = str
+    index.read(SOURCE / "index.theme")
+    theme = index["Icon Theme"]
+    theme["Name"] = "Clavis Reversal"
+    theme["Comment"] = "Reversal icons following the Clavis wallpaper palette"
+    theme["Inherits"] = "Reversal-red-dark,Yaru,Adwaita,hicolor"
+    theme["Hidden"] = "true"
+    for key in ("Directories", "ScaledDirectories"):
+        theme[key] = ",".join(d for d in theme.get(key, "").split(",") if d.startswith(("places/", "mimes/", "places@2x/", "mimes@2x/")))
+    for section in list(index.sections()):
+        if section != "Icon Theme" and not section.startswith(("places/", "mimes/", "places@2x/", "mimes@2x/")):
+            index.remove_section(section)
+    with (destination / "index.theme").open("w") as output:
+        index.write(output)
+    return count, len(originals)
+
+
+def save_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix="." + path.name, dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as output:
+            json.dump(value, output, ensure_ascii=False, indent=2)
+            output.write("\n")
+        os.replace(name, path)
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def main():
+    STATE.mkdir(parents=True, exist_ok=True)
+    with (STATE / "update.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        data = json.loads(PALETTE.read_text())
+        if data.get("schemaVersion") != 1:
+            raise ValueError("Unsupported Clavis icon palette")
+        palette = data["colors"]
+        for role in ("primary", "primary_container", "on_primary", "primary_fixed", "on_primary_fixed", "secondary", "secondary_container", "tertiary", "tertiary_container", "on_surface"):
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", palette.get(role, "")):
+                raise ValueError("Missing or invalid palette color: " + role)
+        digest = hashlib.sha256(json.dumps(palette, sort_keys=True).encode()).hexdigest()
+        current = subprocess.check_output(["gsettings", "get", "org.gnome.desktop.interface", "icon-theme"], text=True).strip().strip("'")
+        state_file = STATE / "state.json"
+        previous = json.loads(state_file.read_text()) if state_file.exists() else {}
+        if previous.get("paletteHash") == digest and current == previous.get("theme") and (ICONS / current / "index.theme").is_file():
+            print("Clavis Reversal icons already match the wallpaper palette")
+            return
+        target_name = THEMES[1] if current == THEMES[0] else THEMES[0]
+        stage = Path(tempfile.mkdtemp(prefix=".clavis-reversal-", dir=ICONS))
+        try:
+            count, unique = make_theme(stage, palette)
+            subprocess.run(["gtk-update-icon-cache", "-f", str(stage)], check=True)
+            destination = ICONS / target_name
+            if destination.exists():
+                shutil.rmtree(destination)
+            stage.replace(destination)
+            subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "icon-theme", target_name], check=True)
+            config_file = CONFIG / "config.json"
+            config = json.loads(config_file.read_text())
+            config.setdefault("theme", {})["iconTheme"] = target_name
+            save_json(config_file, config)
+            save_json(state_file, {"schemaVersion": 1, "theme": target_name, "paletteHash": digest, "primary": palette["primary"], "icons": count, "uniqueIcons": unique})
+            print(f"Activated {target_name}: {count} Reversal icons; primary {palette['primary']}")
+        finally:
+            if stage.exists():
+                shutil.rmtree(stage)
+
+
+if __name__ == "__main__":
+    main()

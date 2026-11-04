@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "colors": {
+    "primary": "#ffb4a8",
+    "primary_container": "#73342b",
+    "on_primary": "#561e16",
+    "primary_fixed": "#ffdad4",
+    "on_primary_fixed": "#3a0905",
+    "secondary": "#e7bdb6",
+    "secondary_container": "#5d3f3b",
+    "tertiary": "#dec48c",
+    "tertiary_container": "#564419",
+    "on_surface": "#f1dfdc"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "file": "ubuntu24.04-x86_64-runtime.tar.gz",
+  "sha256": "00fcb062b1f3a7a5e0f2292c48a03053d294e7eb9fbcb014032670216fa5bde1",
+  "bytes": 413851586,
+  "niriPatch": "niri.patch",
+  "os": "ubuntu",
+  "version": "24.04",
+  "arch": "x86_64",
+  "versions": {
+    "niri": "26.04",
+    "quickshell": "0.3.1",
+    "qt": "6.10.3",
+    "kitty": "0.49.2"
+  }
+}

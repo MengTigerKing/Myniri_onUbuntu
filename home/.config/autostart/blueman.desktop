@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Blueman Bluetooth Manager
+Exec=blueman-applet
+TryExec=blueman-applet
+Icon=blueman
+Terminal=false
+NotShowIn=niri;

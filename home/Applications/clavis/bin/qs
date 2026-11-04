@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+APP_ROOT="@HOME@/Applications"
+QT_ROOT="$APP_ROOT/Qt/6.10.3/gcc_64"
+QS_ROOT="$APP_ROOT/quickshell-0.3.1/install610"
+CLAVIS_ROOT="$APP_ROOT/clavis610/qml"
+export PATH="$QT_ROOT/bin:$QS_ROOT/bin:${PATH}"
+export LD_LIBRARY_PATH="$QT_ROOT/lib:$APP_ROOT/deps/m3shapes/lib:$APP_ROOT/deps/qtkeychain/lib:$APP_ROOT/deps/libcava/lib64:$APP_ROOT/deps/iniparser/lib:$APP_ROOT/deps/wayland125/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}"
+export QT_PLUGIN_PATH="$APP_ROOT/fcitx5-qt610/plugins:$QT_ROOT/plugins${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
+export QML2_IMPORT_PATH="$QT_ROOT/qml:$QS_ROOT/lib/qt6/qml:$APP_ROOT/deps/m3shapes/lib/qt6/qml:$CLAVIS_ROOT${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+export QML_IMPORT_PATH="$QML2_IMPORT_PATH"
+exec "$QS_ROOT/bin/quickshell" "$@"

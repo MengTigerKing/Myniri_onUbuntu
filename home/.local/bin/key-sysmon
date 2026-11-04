@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+qt_root="$HOME/Applications/Qt/6.10.3/gcc_64/lib"
+export LD_LIBRARY_PATH="$qt_root${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$HOME/.local/libexec/key-cli/key-sysmon.bin" "$@"

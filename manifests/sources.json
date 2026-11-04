@@ -1,0 +1,26 @@
+{
+  "clavis": {
+    "revision": "c3ee54f147d5e85db072573857a83ca949a317a0",
+    "upstream": "https://github.com/StatIndet/quickshell.git",
+    "workingTreeIncluded": true
+  },
+  "key-cli": {
+    "revision": "3aed1bdeed204ad6e9714d676b5008943f69920c",
+    "upstream": "https://github.com/StatIndet/key-cli.git",
+    "workingTreeIncluded": true
+  },
+  "quickshell": {
+    "revision": "1a4716cde794a59928d9d9fc15f2afc7a95de360",
+    "upstream": "https://git.outfoxxed.me/quickshell/quickshell.git",
+    "workingTreeIncluded": true
+  },
+  "niri": {
+    "sourceDirectory": "niri-26.04",
+    "patch": "niri.patch",
+    "workingTreeIncluded": true
+  },
+  "xwayland-satellite": {
+    "sourceDirectory": "xwayland-satellite-0.8.3",
+    "workingTreeIncluded": true
+  }
+}

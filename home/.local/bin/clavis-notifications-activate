@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+case ":${XDG_CURRENT_DESKTOP:-}:" in
+    *:niri:*)
+        /usr/bin/systemctl --user start clavis-shell.service
+        exec /usr/bin/gdbus wait --session --timeout=20 org.freedesktop.Notifications
+        ;;
+esac
+exit 0

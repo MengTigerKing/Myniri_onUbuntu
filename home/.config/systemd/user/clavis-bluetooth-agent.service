@@ -1,0 +1,16 @@
+[Unit]
+Description=Bluetooth pairing confirmation agent for Clavis
+Requisite=niri.service
+PartOf=niri.service
+After=niri.service clavis-shell.service
+ConditionEnvironment=XDG_CURRENT_DESKTOP=niri
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/clavis-bluetooth-agent
+Environment=GTK_THEME=ClavisNiri
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=niri.service

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Clavis icon palette
+Exec=@HOME@/.local/bin/clavis-reversal-icons
+OnlyShowIn=niri;

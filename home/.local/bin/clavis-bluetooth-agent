@@ -1,0 +1,103 @@
+#!/usr/bin/python3
+import gettext
+import importlib.util
+import logging
+import os
+from pathlib import Path
+import signal
+import sys
+
+
+local_root = Path.home() / '.local/share/myniri/blueman/usr'
+use_local = importlib.util.find_spec('blueman') is None
+if use_local:
+    sys.path.insert(0, str(local_root / 'lib/python3/dist-packages'))
+    os.environ['GSETTINGS_SCHEMA_DIR'] = str(local_root / 'share/glib-2.0/schemas')
+
+import blueman.Constants as constants
+
+if use_local:
+    constants.UI_PATH = str(local_root / 'share/blueman/ui')
+    constants.ICON_PATH = str(local_root / 'share/icons')
+    constants.PIXMAP_PATH = str(local_root / 'share/blueman/pixmaps')
+    constants.LOCALEDIR = str(local_root / 'share/locale')
+
+gettext.bindtextdomain('blueman', constants.LOCALEDIR)
+gettext.textdomain('blueman')
+logging.basicConfig(level=logging.WARNING)
+
+import gi
+
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gio, GLib, Gtk
+from blueman.main.applet.BluezAgent import BluezAgent
+
+
+class PairingAgent(BluezAgent):
+    def _handle_method_call(self, connection, sender, path, interface_name, method_name, parameters, invocation):
+        print('Bluetooth pairing request: ' + method_name, flush=True)
+        return super()._handle_method_call(
+            connection, sender, path, interface_name, method_name, parameters, invocation)
+
+    @staticmethod
+    def _return_dbus_error(invocation, error):
+        print('Bluetooth pairing response error: ' + type(error).__name__, flush=True)
+        BluezAgent._return_dbus_error(invocation, error)
+
+
+def main():
+    initialized, _arguments = Gtk.init_check(None)
+    if not initialized:
+        raise SystemExit('Bluetooth pairing agent requires a graphical session')
+    Gtk.IconTheme.get_default().append_search_path(constants.ICON_PATH)
+    loop = GLib.MainLoop()
+    agent = PairingAgent()
+    agent_path = '/org/bluez/agent/blueman'
+    state = {'registered': False, 'exit_code': 0}
+
+    def manager_call(connection, method, parameters):
+        return connection.call_sync(
+            'org.bluez', '/org/bluez', 'org.bluez.AgentManager1', method,
+            parameters, None, Gio.DBusCallFlags.NONE, 10000, None)
+
+    def appeared(connection, _name, _owner):
+        try:
+            agent.register()
+            manager_call(connection, 'RegisterAgent', GLib.Variant('(os)', (agent_path, 'KeyboardDisplay')))
+            state['registered'] = True
+            manager_call(connection, 'RequestDefaultAgent', GLib.Variant('(o)', (agent_path,)))
+            print('BlueZ default pairing agent registered: KeyboardDisplay; bus ' + connection.get_unique_name(), flush=True)
+        except GLib.Error as error:
+            logging.error('Could not register Bluetooth pairing agent: %s', error)
+            state['exit_code'] = 1
+            loop.quit()
+
+    def vanished(_connection, _name):
+        state['registered'] = False
+        agent._on_cancel()
+        agent.unregister()
+        print('Waiting for BlueZ', flush=True)
+
+    def stop():
+        loop.quit()
+        return GLib.SOURCE_REMOVE
+
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, stop)
+    watch = Gio.bus_watch_name(Gio.BusType.SYSTEM, 'org.bluez', Gio.BusNameWatcherFlags.NONE, appeared, vanished)
+    try:
+        loop.run()
+    finally:
+        Gio.bus_unwatch_name(watch)
+        agent._on_cancel()
+        if state['registered']:
+            try:
+                manager_call(Gio.bus_get_sync(Gio.BusType.SYSTEM), 'UnregisterAgent', GLib.Variant('(o)', (agent_path,)))
+            except GLib.Error:
+                pass
+        agent.unregister()
+    return state['exit_code']
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

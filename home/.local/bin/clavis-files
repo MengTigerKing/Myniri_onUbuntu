@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+case ":${XDG_CURRENT_DESKTOP:-}:" in
+    *:niri:*) export GTK_THEME=ClavisNiri GDK_BACKEND=wayland NAUTILUS_DISABLE_PLUGINS=TRUE ;;
+esac
+exec /usr/bin/nautilus "$@"

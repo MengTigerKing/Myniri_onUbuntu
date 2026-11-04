@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+export PYTHONPATH="$HOME/Applications/key-cli/src${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 -m key_cli "$@"
