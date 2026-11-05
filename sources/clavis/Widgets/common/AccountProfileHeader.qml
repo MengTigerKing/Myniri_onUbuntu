@@ -297,7 +297,7 @@ Rectangle {
                 Text {
                     text: root.distroLogo()
                     color: Appearance.colors.colPrimary
-                    font.family: Fonts.numeric
+                    font.family: Fonts.nerdSymbols
                     font.pixelSize: 18
                 }
 

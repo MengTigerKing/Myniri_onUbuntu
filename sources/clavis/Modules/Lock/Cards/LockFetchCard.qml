@@ -10,9 +10,11 @@ Rectangle {
     readonly property string systemUser: SystemIdentityService.accountName
     readonly property string hostName: SystemIdentityService.hostName
     readonly property string distroId: SystemIdentityService.distroId
-    readonly property int sidePadding: detailLevel <= 1 ? Metrics.lockOuterPadding : Metrics.lockOuterPadding * 2
+    readonly property int sidePadding: detailLevel <= 1 ? Metrics.lockOuterPadding : Metrics.lockOuterPadding
+                                                          * 2
     readonly property int topPadding: Metrics.lockOuterPadding
-    readonly property int bottomPadding: detailLevel <= 1 ? Metrics.lockOuterPadding : Metrics.lockOuterPadding * 2
+    readonly property int bottomPadding: detailLevel <= 1 ? Metrics.lockOuterPadding :
+                                                            Metrics.lockOuterPadding * 2
     readonly property int promptSize: 45
     readonly property int fetchFontSize: width >= 533 ? 20 : 17
     readonly property int headerFontSize: width >= 533 ? 20 : 17
@@ -21,7 +23,8 @@ Rectangle {
     readonly property int bodySpacing: Math.max(18, Math.min(32, Math.floor(bodyRow.height * 0.15)))
     readonly property int contentWidth: Math.max(0, width - sidePadding * 2)
     readonly property int logoColumnWidth: Math.max(118, Math.floor(contentWidth * 0.42))
-    readonly property int infoColumnWidth: Math.max(0, contentWidth - (root.width >= 300 ? logoColumnWidth + bodySpacing : 0))
+    readonly property int infoColumnWidth: Math.max(0, contentWidth - (root.width >= 300 ? logoColumnWidth + bodySpacing :
+                                                                                           0))
 
     function distroLogo() {
         const id = String(root.distroId || "").toLowerCase();
@@ -42,7 +45,10 @@ Rectangle {
     }
 
     function paletteModel() {
-        const colors = [Appearance.colors.colPrimary, Appearance.colors.colSecondary, Appearance.colors.colTertiary, Appearance.colors.colPrimaryContainer, Appearance.colors.colSecondaryContainer, Appearance.colors.colTertiaryContainer, Appearance.colors.colPrimary, Appearance.colors.colSecondary];
+        const colors = [Appearance.colors.colPrimary, Appearance.colors.colSecondary,
+                        Appearance.colors.colTertiary, Appearance.colors.colPrimaryContainer,
+                        Appearance.colors.colSecondaryContainer, Appearance.colors.colTertiaryContainer,
+                        Appearance.colors.colPrimary, Appearance.colors.colSecondary];
         const count = Math.max(0, Math.min(8, Math.floor(root.infoColumnWidth / 34)));
         return colors.slice(0, count);
     }
@@ -82,7 +88,6 @@ Rectangle {
                     font.pixelSize: root.headerFontSize
                     font.bold: true
                 }
-
             }
 
             Text {
@@ -95,7 +100,6 @@ Rectangle {
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
             }
-
         }
 
         RowLayout {
@@ -115,11 +119,10 @@ Rectangle {
                     anchors.centerIn: parent
                     text: root.distroLogo()
                     color: Appearance.colors.colPrimary
-                    font.family: Fonts.numeric
+                    font.family: Fonts.nerdSymbols
                     font.pixelSize: Math.floor(Math.min(parent.width, parent.height) * 0.94)
                     font.bold: true
                 }
-
             }
 
             ColumnLayout {
@@ -213,15 +216,10 @@ Rectangle {
                             radius: 7
                             color: modelData
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
 
     component FetchLine: RowLayout {
@@ -263,7 +261,5 @@ Rectangle {
             font.pixelSize: root.fetchFontSize
             elide: Text.ElideRight
         }
-
     }
-
 }

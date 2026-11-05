@@ -185,6 +185,7 @@ Singleton {
         if (!root.isNiriSession || !PersonalizationConfig.ready)
             return;
         root.generateNiriCursorConfig();
+        cursorSyncTimer.restart();
     }
 
     function generateNiriCursorConfig() {
@@ -318,6 +319,31 @@ Singleton {
 
     onSystemDefaultCursorThemeChanged: root.applyCursorSettings()
 
+    Timer {
+        id: cursorSyncTimer
+        interval: 150
+        onTriggered: {
+            if (cursorSyncProcess.running) {
+                restart();
+                return;
+            }
+            cursorSyncProcess.command = ["python3", Paths.scriptPath("theme", "sync_cursor_settings.py"),
+                                         root.effectiveCursorTheme(), String(
+                                             PersonalizationConfig.cursorSize)];
+            cursorSyncProcess.running = true;
+        }
+    }
+
+    Process {
+        id: cursorSyncProcess
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim() !== "")
+                console.warn("Cursor settings sync:", this.text.trim());
+            }
+        }
+    }
+
     Process {
         id: detectIconThemesProcess
         stdout: StdioCollector {
@@ -346,7 +372,7 @@ Singleton {
     Process {
         id: generateColorsProcess
         onRunningChanged: if (running)
-                              root.generating = true
+        root.generating = true
         stderr: StdioCollector {
             id: generationStderr
         }
@@ -355,13 +381,13 @@ Singleton {
                 try {
                     const status = JSON.parse(data);
                     if (status.schemaVersion !== 1)
-                        return;
+                    return;
                     if (status.event === "core-ready") {
                         root.coreReloaded = true;
                         Appearance.reloadColors();
                     } else if (status.event === "external-error") {
                         root.externalGenerationError += (root.externalGenerationError ? "\n" : "")
-                                + status.id + ": " + status.error;
+                        + status.id + ": " + status.error;
                     } else if (status.event === "core-error") {
                         root.generationError = status.error;
                     }
@@ -374,15 +400,15 @@ Singleton {
             root.generating = false;
             root.generationTemplateId = "";
             if ((exitCode === 0 || exitCode === 3) && !root.coreReloaded)
-                Appearance.reloadColors();
+            Appearance.reloadColors();
             if (exitCode !== 0 && exitCode !== 3)
-                root.generationError = root.generationError || generationStderr.text.trim() || qsTr(
-                            "Failed to generate Matugen colors");
+            root.generationError = root.generationError || generationStderr.text.trim() || qsTr(
+                "Failed to generate Matugen colors");
             if (exitCode === 3 && !root.externalGenerationError)
-                root.externalGenerationError = generationStderr.text.trim() || qsTr(
-                            "Some Matugen templates failed to generate");
+            root.externalGenerationError = generationStderr.text.trim() || qsTr(
+                "Some Matugen templates failed to generate");
             if (root.pendingGeneration)
-                Qt.callLater(root.resumeGeneration);
+            Qt.callLater(root.resumeGeneration);
         }
     }
 }

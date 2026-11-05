@@ -90,6 +90,8 @@ def main():
         '.config/systemd/user/clavis-bluetooth-agent.service', '.config/autostart/blueman.desktop',
         '.local/bin/clavis-bluetooth-agent',
         '.local/bin/clavis-files', '.local/bin/clavis-reversal-icons',
+        '.local/bin/clavis-chrome', '.local/share/applications/google-chrome.desktop',
+        '.local/share/icons/breeze_cursors', '.icons/breeze_cursors',
         '.local/share/themes/ClavisNiri', '.local/share/clavis/reversal-icons/palette.json',
         '.local/share/applications/kitty.desktop', '.local/share/applications/kitty-open.desktop',
     ]

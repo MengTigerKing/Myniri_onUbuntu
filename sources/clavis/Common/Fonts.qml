@@ -31,6 +31,8 @@ Singleton {
     readonly property string systemClock: root.bundledFamilyName
     readonly property string materialSymbolsRounded: "Material Symbols Rounded"
     readonly property string materialSymbolsOutlined: "Material Symbols Outlined"
+    readonly property string nerdSymbols: root.resolveFamily("Symbols Nerd Font Mono",
+                                                             "JetBrainsMono Nerd Font", root.mono)
 
     function familyAvailable(family) {
         const value = String(family || "").trim();

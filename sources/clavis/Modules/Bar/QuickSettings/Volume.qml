@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.Services
+import qs.Services as Services
 import qs.Common
 import qs.Widgets.common
 
@@ -35,20 +36,20 @@ Item {
                     Layout.preferredHeight: Sizes.barControlCircleSize
                     Layout.alignment: Qt.AlignCenter
 
-                    value: Volume.sinkVolume
-                    progressColor: (Volume.sinkMuted || Volume.sinkVolume <= 0) ? Appearance.colors.colError :
-                                                                                  Appearance.colors.colPrimary
+                    value: Services.Volume.sinkVolume
+                    progressColor: (Services.Volume.sinkMuted || Services.Volume.sinkVolume <= 0)
+                                   ? Appearance.colors.colError : Appearance.colors.colPrimary
                     trackColor: Appearance.colors.colLayer2Hover
                     handleColor: Appearance.colors.colOnSurface
-                    iconColor: (Volume.sinkMuted || Volume.sinkVolume <= 0) ? Appearance.colors.colError :
-                                                                              Appearance.colors.colOnSurface
+                    iconColor: (Services.Volume.sinkMuted || Services.Volume.sinkVolume <= 0)
+                               ? Appearance.colors.colError : Appearance.colors.colOnSurface
 
                     icon: {
-                        if (Volume.isHeadphone)
+                        if (Services.Volume.isHeadphone)
                             return "headphones";
-                        if (Volume.sinkMuted || Volume.sinkVolume <= 0)
+                        if (Services.Volume.sinkMuted || Services.Volume.sinkVolume <= 0)
                             return "volume_off";
-                        if (Volume.sinkVolume < 0.5)
+                        if (Services.Volume.sinkVolume < 0.5)
                             return "volume_down";
                         return "volume_up";
                     }
@@ -57,7 +58,7 @@ Item {
                 Text {
                     id: valueText
                     visible: root.showValue
-                    text: Math.round(Volume.sinkVolume * 100) + "%"
+                    text: Math.round(Services.Volume.sinkVolume * 100) + "%"
                     font.family: Fonts.numeric
                     font.pixelSize: 12
                     color: Appearance.colors.colOnSurface
@@ -67,17 +68,6 @@ Item {
         }
         Accessible.name: tooltip.text
 
-        WheelHandler {
-            onWheel: wheel => {
-                const step = 0.05;
-                let newVol = Volume.sinkVolume;
-                if (wheel.angleDelta.y > 0)
-                    newVol += step;
-                else
-                    newVol -= step;
-                Volume.setSinkVolume(newVol);
-            }
-        }
         onClicked: {
             if (root.screen && root.screen.name)
                 WidgetState.quickSettingsScreenName = root.screen.name;
@@ -90,11 +80,26 @@ Item {
         }
     }
 
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: wheel => {
+                     const delta = wheel.angleDelta.y || wheel.pixelDelta.y;
+                     if (delta === 0) {
+                         wheel.accepted = false;
+                         return;
+                     }
+                     wheel.accepted = Services.Volume.setSinkVolume(Services.Volume.sinkVolume + (delta > 0
+                                                                                                  ? 0.05 :
+                                                                                                    -0.05));
+                 }
+    }
+
     PopupToolTip {
         id: tooltip
         extraVisibleCondition: mouseArea.pointerHovered
-        text: (Volume.sinkMuted ? qsTr("Volume: muted") : qsTr("Volume: ") + Math.round(Volume.sinkVolume
-                                                                                        * 100) + "%") + qsTr(
+        text: (Services.Volume.sinkMuted ? qsTr("Volume: muted") : qsTr("Volume: ") + Math.round(
+                                               Services.Volume.sinkVolume * 100) + "%") + qsTr(
                   "\nScroll to adjust; click to open sound")
     }
 }

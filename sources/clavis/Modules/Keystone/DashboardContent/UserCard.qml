@@ -184,7 +184,7 @@ Rectangle {
             anchors.centerIn: parent
             text: root.distroLogo()
             color: Appearance.colors.colOnPrimaryContainer
-            font.family: Fonts.mono
+            font.family: Fonts.nerdSymbols
             font.pixelSize: 25
             font.bold: true
         }

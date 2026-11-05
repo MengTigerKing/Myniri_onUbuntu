@@ -1,9 +1,9 @@
 diff --git a/Common/Fonts.qml b/Common/Fonts.qml
-index b744ea5..4fda031 100644
+index b744ea5..1421f91 100644
 --- a/Common/Fonts.qml
 +++ b/Common/Fonts.qml
 @@ -7,8 +7,8 @@ Singleton {
- 
+
      // User-configurable family defaults. Keep all family literals in this
      // singleton so components only depend on semantic roles.
 -    readonly property string defaultUi: "LXGW WenKai GB Screen"
@@ -13,6 +13,15 @@ index b744ea5..4fda031 100644
      readonly property string defaultNumeric: root.defaultMono
      readonly property string bundledFamilyName: bundledFont.name || "Google Sans Flex"
      // These preferences are deliberately separate from the effective family
+@@ -31,6 +31,8 @@ Singleton {
+     readonly property string systemClock: root.bundledFamilyName
+     readonly property string materialSymbolsRounded: "Material Symbols Rounded"
+     readonly property string materialSymbolsOutlined: "Material Symbols Outlined"
++    readonly property string nerdSymbols: root.resolveFamily("Symbols Nerd Font Mono",
++                                                             "JetBrainsMono Nerd Font", root.mono)
+
+     function familyAvailable(family) {
+         const value = String(family || "").trim();
 diff --git a/Common/functions/DisplayConfiguration.js b/Common/functions/DisplayConfiguration.js
 index a7c8a20..c4793d2 100644
 --- a/Common/functions/DisplayConfiguration.js
@@ -28,6 +37,250 @@ index a7c8a20..c4793d2 100644
      const dimensions=String(s.mode || "0x0").split("@")[0].split("x").map(Number);
      const rotated=["90","270","flipped-90","flipped-270"].indexOf(s.transform)>=0;
      const scale=Math.round((s.scale||1)*120)/120;
+diff --git a/Modules/Bar/QuickSettings/Brightness.qml b/Modules/Bar/QuickSettings/Brightness.qml
+index 40f5ded..badf1d8 100644
+--- a/Modules/Bar/QuickSettings/Brightness.qml
++++ b/Modules/Bar/QuickSettings/Brightness.qml
+@@ -2,6 +2,7 @@ import QtQuick
+ import QtQuick.Layouts
+ import Quickshell
+ import qs.Services
++import qs.Services as Services
+ import qs.Common
+ import qs.Widgets.common
+
+@@ -11,8 +12,8 @@ Item {
+     property var screen: null
+     property bool vertical: false
+     readonly property bool showValue: PersonalizationConfig.barShowValues
+-    readonly property var monitor: Brightness.getMonitorForScreen(screen)
+-    readonly property real brightnessValue: monitor ? monitor.brightness : Brightness.brightnessValue
++    readonly property var monitor: Services.Brightness.getMonitorForScreen(screen)
++    readonly property real brightnessValue: monitor ? monitor.brightness : Services.Brightness.brightnessValue
+
+     implicitWidth: mouseArea.implicitWidth
+     implicitHeight: mouseArea.implicitHeight
+@@ -57,19 +58,22 @@ Item {
+             }
+         }
+         Accessible.name: tooltip.text
++    }
+
+-        WheelHandler {
+-            onWheel: wheel => {
+-                const step = 0.05;
+-                let newBri = root.brightnessValue;
+-                if (wheel.angleDelta.y > 0)
+-                    newBri += step;
+-                else
+-                    newBri -= step;
+-                Brightness.setBrightnessForScreen(root.screen, newBri);
+-                wheel.accepted = true;
+-            }
+-        }
++    MouseArea {
++        anchors.fill: parent
++        acceptedButtons: Qt.NoButton
++        onWheel: wheel => {
++                     const delta = wheel.angleDelta.y || wheel.pixelDelta.y;
++                     if (delta === 0) {
++                         wheel.accepted = false;
++                         return;
++                     }
++                     Services.Brightness.setBrightnessForScreen(root.screen, root.brightnessValue + (delta
++                                                                                                     > 0 ? 0.05 :
++                                                                                                           -0.05));
++                     wheel.accepted = true;
++                 }
+     }
+
+     PopupToolTip {
+diff --git a/Modules/Bar/QuickSettings/Microphone.qml b/Modules/Bar/QuickSettings/Microphone.qml
+index 43e07fc..134ca20 100644
+--- a/Modules/Bar/QuickSettings/Microphone.qml
++++ b/Modules/Bar/QuickSettings/Microphone.qml
+@@ -2,6 +2,7 @@ import QtQuick
+ import QtQuick.Layouts
+ import Quickshell
+ import qs.Services
++import qs.Services as Services
+ import qs.Common
+ import qs.Widgets.common
+
+@@ -35,20 +36,22 @@ Item {
+                     Layout.preferredHeight: Sizes.barControlCircleSize
+                     Layout.alignment: Qt.AlignCenter
+
+-                    value: Volume.sourceMuted ? 0 : Volume.sourceVolume
+-                    progressColor: (Volume.sourceMuted || Volume.sourceVolume <= 0)
++                    value: Services.Volume.sourceMuted ? 0 : Services.Volume.sourceVolume
++                    progressColor: (Services.Volume.sourceMuted || Services.Volume.sourceVolume <= 0)
+                                    ? Appearance.colors.colError : Appearance.colors.colPrimary
+                     trackColor: Appearance.colors.colLayer2Hover
+                     handleColor: Appearance.colors.colOnSurface
+-                    iconColor: (Volume.sourceMuted || Volume.sourceVolume <= 0) ? Appearance.colors.colError :
+-                                                                                  Appearance.colors.colOnSurface
+-                    icon: (Volume.sourceMuted || Volume.sourceVolume <= 0) ? "mic_off" : "mic"
++                    iconColor: (Services.Volume.sourceMuted || Services.Volume.sourceVolume <= 0)
++                               ? Appearance.colors.colError : Appearance.colors.colOnSurface
++                    icon: (Services.Volume.sourceMuted || Services.Volume.sourceVolume <= 0) ? "mic_off" :
++                                                                                               "mic"
++
+                 }
+
+                 Text {
+                     id: valueText
+                     visible: root.showValue
+-                    text: Math.round(Volume.sourceVolume * 100) + "%"
++                    text: Math.round(Services.Volume.sourceVolume * 100) + "%"
+                     font.family: Fonts.numeric
+                     font.pixelSize: 12
+                     color: Appearance.colors.colOnSurface
+@@ -58,18 +61,6 @@ Item {
+         }
+         Accessible.name: tooltip.text
+
+-        WheelHandler {
+-            onWheel: wheel => {
+-                const step = 0.05;
+-                let newVol = Volume.sourceVolume;
+-                if (wheel.angleDelta.y > 0)
+-                    newVol += step;
+-                else
+-                    newVol -= step;
+-                Volume.setSourceVolume(newVol);
+-                wheel.accepted = true;
+-            }
+-        }
+         onClicked: {
+             if (root.screen && root.screen.name)
+                 WidgetState.quickSettingsScreenName = root.screen.name;
+@@ -82,11 +73,26 @@ Item {
+         }
+     }
+
++    MouseArea {
++        anchors.fill: parent
++        acceptedButtons: Qt.NoButton
++        onWheel: wheel => {
++                     const delta = wheel.angleDelta.y || wheel.pixelDelta.y;
++                     if (delta === 0) {
++                         wheel.accepted = false;
++                         return;
++                     }
++                     wheel.accepted = Services.Volume.setSourceVolume(Services.Volume.sourceVolume + (delta
++                                                                                                      > 0 ? 0.05 :
++                                                                                                            -0.05));
++                 }
++    }
++
+     PopupToolTip {
+         id: tooltip
+         extraVisibleCondition: mouseArea.pointerHovered
+-        text: (Volume.sourceMuted ? qsTr("Microphone: muted") : qsTr("Microphone: ") + Math.round(
+-                                        Volume.sourceVolume * 100) + "%") + qsTr(
++        text: (Services.Volume.sourceMuted ? qsTr("Microphone: muted") : qsTr("Microphone: ") + Math.round(
++                                                 Services.Volume.sourceVolume * 100) + "%") + qsTr(
+                   "\nScroll to adjust; click to open microphone controls")
+     }
+ }
+diff --git a/Modules/Bar/QuickSettings/Volume.qml b/Modules/Bar/QuickSettings/Volume.qml
+index 9247ae9..ecf4abb 100644
+--- a/Modules/Bar/QuickSettings/Volume.qml
++++ b/Modules/Bar/QuickSettings/Volume.qml
+@@ -2,6 +2,7 @@ import QtQuick
+ import QtQuick.Layouts
+ import Quickshell
+ import qs.Services
++import qs.Services as Services
+ import qs.Common
+ import qs.Widgets.common
+
+@@ -35,20 +36,20 @@ Item {
+                     Layout.preferredHeight: Sizes.barControlCircleSize
+                     Layout.alignment: Qt.AlignCenter
+
+-                    value: Volume.sinkVolume
+-                    progressColor: (Volume.sinkMuted || Volume.sinkVolume <= 0) ? Appearance.colors.colError :
+-                                                                                  Appearance.colors.colPrimary
++                    value: Services.Volume.sinkVolume
++                    progressColor: (Services.Volume.sinkMuted || Services.Volume.sinkVolume <= 0)
++                                   ? Appearance.colors.colError : Appearance.colors.colPrimary
+                     trackColor: Appearance.colors.colLayer2Hover
+                     handleColor: Appearance.colors.colOnSurface
+-                    iconColor: (Volume.sinkMuted || Volume.sinkVolume <= 0) ? Appearance.colors.colError :
+-                                                                              Appearance.colors.colOnSurface
++                    iconColor: (Services.Volume.sinkMuted || Services.Volume.sinkVolume <= 0)
++                               ? Appearance.colors.colError : Appearance.colors.colOnSurface
+
+                     icon: {
+-                        if (Volume.isHeadphone)
++                        if (Services.Volume.isHeadphone)
+                             return "headphones";
+-                        if (Volume.sinkMuted || Volume.sinkVolume <= 0)
++                        if (Services.Volume.sinkMuted || Services.Volume.sinkVolume <= 0)
+                             return "volume_off";
+-                        if (Volume.sinkVolume < 0.5)
++                        if (Services.Volume.sinkVolume < 0.5)
+                             return "volume_down";
+                         return "volume_up";
+                     }
+@@ -57,7 +58,7 @@ Item {
+                 Text {
+                     id: valueText
+                     visible: root.showValue
+-                    text: Math.round(Volume.sinkVolume * 100) + "%"
++                    text: Math.round(Services.Volume.sinkVolume * 100) + "%"
+                     font.family: Fonts.numeric
+                     font.pixelSize: 12
+                     color: Appearance.colors.colOnSurface
+@@ -67,17 +68,6 @@ Item {
+         }
+         Accessible.name: tooltip.text
+
+-        WheelHandler {
+-            onWheel: wheel => {
+-                const step = 0.05;
+-                let newVol = Volume.sinkVolume;
+-                if (wheel.angleDelta.y > 0)
+-                    newVol += step;
+-                else
+-                    newVol -= step;
+-                Volume.setSinkVolume(newVol);
+-            }
+-        }
+         onClicked: {
+             if (root.screen && root.screen.name)
+                 WidgetState.quickSettingsScreenName = root.screen.name;
+@@ -90,11 +80,26 @@ Item {
+         }
+     }
+
++    MouseArea {
++        anchors.fill: parent
++        acceptedButtons: Qt.NoButton
++        onWheel: wheel => {
++                     const delta = wheel.angleDelta.y || wheel.pixelDelta.y;
++                     if (delta === 0) {
++                         wheel.accepted = false;
++                         return;
++                     }
++                     wheel.accepted = Services.Volume.setSinkVolume(Services.Volume.sinkVolume + (delta > 0
++                                                                                                  ? 0.05 :
++                                                                                                    -0.05));
++                 }
++    }
++
+     PopupToolTip {
+         id: tooltip
+         extraVisibleCondition: mouseArea.pointerHovered
+-        text: (Volume.sinkMuted ? qsTr("Volume: muted") : qsTr("Volume: ") + Math.round(Volume.sinkVolume
+-                                                                                        * 100) + "%") + qsTr(
++        text: (Services.Volume.sinkMuted ? qsTr("Volume: muted") : qsTr("Volume: ") + Math.round(
++                                               Services.Volume.sinkVolume * 100) + "%") + qsTr(
+                   "\nScroll to adjust; click to open sound")
+     }
+ }
 diff --git a/Modules/Dock/DockFolderFan.qml b/Modules/Dock/DockFolderFan.qml
 index 975e479..beb6142 100644
 --- a/Modules/Dock/DockFolderFan.qml
@@ -60,6 +313,19 @@ index 975e479..beb6142 100644
          interactive: root.progress === 1 && !DockService.fileDragActive
          delegate: Item {
              id: row
+diff --git a/Modules/Keystone/DashboardContent/UserCard.qml b/Modules/Keystone/DashboardContent/UserCard.qml
+index 9e6919a..daf85ba 100644
+--- a/Modules/Keystone/DashboardContent/UserCard.qml
++++ b/Modules/Keystone/DashboardContent/UserCard.qml
+@@ -184,7 +184,7 @@ Rectangle {
+             anchors.centerIn: parent
+             text: root.distroLogo()
+             color: Appearance.colors.colOnPrimaryContainer
+-            font.family: Fonts.mono
++            font.family: Fonts.nerdSymbols
+             font.pixelSize: 25
+             font.bold: true
+         }
 diff --git a/Modules/Lock/CaelestiaLock.qml b/Modules/Lock/CaelestiaLock.qml
 index c2c4df4..4f5015c 100644
 --- a/Modules/Lock/CaelestiaLock.qml
@@ -70,33 +336,33 @@ index c2c4df4..4f5015c 100644
  import qs.Common
 +import qs.Modules.Wallpaper
  import qs.Services
- 
+
  Item {
 @@ -41,11 +42,12 @@ Item {
          if (startupStarted || !snapshotResolved)
              return;
- 
+
 -        if (snapshotResult && snapshotImage.status !== Image.Ready && snapshotImage.status !== Image.Error)
 +        if (wallpaperBackground.sourcePath !== "" && !wallpaperBackground.ready
 +                && wallpaperBackground.imageStatus !== Image.Error)
              return;
- 
+
 -        if (snapshotResult && snapshotImage.status === Image.Error)
 -            console.warn("Unable to display pre-lock snapshot for output " + root.screen.name);
 +        if (wallpaperBackground.sourcePath !== "" && wallpaperBackground.imageStatus === Image.Error)
 +            console.warn("Unable to display lock wallpaper for output " + root.screen.name);
- 
+
          startupStarted = true;
          startupAnim.start();
 @@ -78,24 +80,28 @@ Item {
          color: Appearance.colors.colLayer0Base
      }
- 
+
 -    Image {
 -        id: snapshotImage
 +    WallpaperImageViewport {
 +        id: wallpaperBackground
- 
+
          anchors.fill: parent
 -        source: root.snapshotResult ? root.snapshotResult.url : ""
 -        fillMode: Image.Stretch
@@ -114,7 +380,7 @@ index c2c4df4..4f5015c 100644
 -        onStatusChanged: root.maybeStartStartupAnimation()
 +        onReadyChanged: root.maybeStartStartupAnimation()
 +        onImageStatusChanged: root.maybeStartStartupAnimation()
- 
+
          layer.effect: MultiEffect {
              autoPaddingEnabled: false
              blurEnabled: true
@@ -125,7 +391,100 @@ index c2c4df4..4f5015c 100644
 +            saturation: -0.12
          }
      }
- 
+
+diff --git a/Modules/Lock/Cards/LockFetchCard.qml b/Modules/Lock/Cards/LockFetchCard.qml
+index 414e1ec..c55486b 100644
+--- a/Modules/Lock/Cards/LockFetchCard.qml
++++ b/Modules/Lock/Cards/LockFetchCard.qml
+@@ -10,9 +10,11 @@ Rectangle {
+     readonly property string systemUser: SystemIdentityService.accountName
+     readonly property string hostName: SystemIdentityService.hostName
+     readonly property string distroId: SystemIdentityService.distroId
+-    readonly property int sidePadding: detailLevel <= 1 ? Metrics.lockOuterPadding : Metrics.lockOuterPadding * 2
++    readonly property int sidePadding: detailLevel <= 1 ? Metrics.lockOuterPadding : Metrics.lockOuterPadding
++                                                          * 2
+     readonly property int topPadding: Metrics.lockOuterPadding
+-    readonly property int bottomPadding: detailLevel <= 1 ? Metrics.lockOuterPadding : Metrics.lockOuterPadding * 2
++    readonly property int bottomPadding: detailLevel <= 1 ? Metrics.lockOuterPadding :
++                                                            Metrics.lockOuterPadding * 2
+     readonly property int promptSize: 45
+     readonly property int fetchFontSize: width >= 533 ? 20 : 17
+     readonly property int headerFontSize: width >= 533 ? 20 : 17
+@@ -21,7 +23,8 @@ Rectangle {
+     readonly property int bodySpacing: Math.max(18, Math.min(32, Math.floor(bodyRow.height * 0.15)))
+     readonly property int contentWidth: Math.max(0, width - sidePadding * 2)
+     readonly property int logoColumnWidth: Math.max(118, Math.floor(contentWidth * 0.42))
+-    readonly property int infoColumnWidth: Math.max(0, contentWidth - (root.width >= 300 ? logoColumnWidth + bodySpacing : 0))
++    readonly property int infoColumnWidth: Math.max(0, contentWidth - (root.width >= 300 ? logoColumnWidth + bodySpacing :
++                                                                                           0))
+
+     function distroLogo() {
+         const id = String(root.distroId || "").toLowerCase();
+@@ -42,7 +45,10 @@ Rectangle {
+     }
+
+     function paletteModel() {
+-        const colors = [Appearance.colors.colPrimary, Appearance.colors.colSecondary, Appearance.colors.colTertiary, Appearance.colors.colPrimaryContainer, Appearance.colors.colSecondaryContainer, Appearance.colors.colTertiaryContainer, Appearance.colors.colPrimary, Appearance.colors.colSecondary];
++        const colors = [Appearance.colors.colPrimary, Appearance.colors.colSecondary,
++                        Appearance.colors.colTertiary, Appearance.colors.colPrimaryContainer,
++                        Appearance.colors.colSecondaryContainer, Appearance.colors.colTertiaryContainer,
++                        Appearance.colors.colPrimary, Appearance.colors.colSecondary];
+         const count = Math.max(0, Math.min(8, Math.floor(root.infoColumnWidth / 34)));
+         return colors.slice(0, count);
+     }
+@@ -82,7 +88,6 @@ Rectangle {
+                     font.pixelSize: root.headerFontSize
+                     font.bold: true
+                 }
+-
+             }
+
+             Text {
+@@ -95,7 +100,6 @@ Rectangle {
+                 elide: Text.ElideRight
+                 verticalAlignment: Text.AlignVCenter
+             }
+-
+         }
+
+         RowLayout {
+@@ -115,11 +119,10 @@ Rectangle {
+                     anchors.centerIn: parent
+                     text: root.distroLogo()
+                     color: Appearance.colors.colPrimary
+-                    font.family: Fonts.numeric
++                    font.family: Fonts.nerdSymbols
+                     font.pixelSize: Math.floor(Math.min(parent.width, parent.height) * 0.94)
+                     font.bold: true
+                 }
+-
+             }
+
+             ColumnLayout {
+@@ -213,15 +216,10 @@ Rectangle {
+                             radius: 7
+                             color: modelData
+                         }
+-
+                     }
+-
+                 }
+-
+             }
+-
+         }
+-
+     }
+
+     component FetchLine: RowLayout {
+@@ -263,7 +261,5 @@ Rectangle {
+             font.pixelSize: root.fetchFontSize
+             elide: Text.ElideRight
+         }
+-
+     }
+-
+ }
 diff --git a/Modules/Lock/README.md b/Modules/Lock/README.md
 index 4724c98..ec82732 100644
 --- a/Modules/Lock/README.md
@@ -133,7 +492,7 @@ index 4724c98..ec82732 100644
 @@ -4,19 +4,21 @@ Settings Center → Theme → Lock screen selects `default` or `caelestia`.
  The selection is saved as `theme.lockScreenStyle` in the personalization config.
  Missing or invalid values use `default`; each lock session keeps its initial selection.
- 
+
 -`CaelestiaLock.qml` preserves the original card layout. `DefaultLock.qml` reveals a
 +`CaelestiaLock.qml` preserves the original card layout and renders the current
 +wallpaper through a strong Qt Quick `MultiEffect` blur. `DefaultLock.qml` reveals a
@@ -154,9 +513,9 @@ index 4724c98..ec82732 100644
 -fade. The wallpaper itself is still sourced from the current wallpaper image.
 +There is no PNG/base64/data-URL round trip. The wallpaper itself is sourced from the
 +current wallpaper image.
- 
+
  Manual visual checks in a graphical session:
- 
+
 @@ -25,7 +27,8 @@ Manual visual checks in a graphical session:
  - Verify 12-hour AM/PM and 24-hour clocks, and the date at midnight.
  - Type, delete, submit an incorrect password, then authenticate successfully.
@@ -164,7 +523,7 @@ index 4724c98..ec82732 100644
 -- Verify entrance reveals the blurred wallpaper over the desktop snapshot without a black flash.
 +- Verify the Caelestia style shows only the blurred wallpaper without a black flash.
 +- Verify the default style reveals the blurred wallpaper over the desktop snapshot.
- 
+
  If capture fails or times out, locking still proceeds. Default shows the wallpaper
  without a disc reveal or a fade to a missing snapshot. The main shell does not
 diff --git a/Modules/Sidebars/Dashboard/DrawerView.qml b/Modules/Sidebars/Dashboard/DrawerView.qml
@@ -231,7 +590,7 @@ index 250e443..35d5db5 100644
 +                                return;
 +                                event.accepted = true;
 +                            }
- 
+
              MouseArea {
                  id: backgroundDrag
 @@ -470,30 +469,38 @@ Item {
@@ -304,14 +663,14 @@ index 250e443..35d5db5 100644
 -                        return;
 +                                          if (root.draggingTileId.length === 0)
 +                                          return;
- 
+
 -                    root.cancelDrag();
 -                    event.accepted = true;
 -                }
 +                                          root.cancelDrag();
 +                                          event.accepted = true;
 +                                      }
- 
+
                  Loader {
                      width: dashboard.width
 @@ -594,18 +601,18 @@ Item {
@@ -342,6 +701,151 @@ index 250e443..35d5db5 100644
                      }
                  }
              }
+diff --git a/Services/MediaManager.qml b/Services/MediaManager.qml
+index 38bce2a..7382e10 100644
+--- a/Services/MediaManager.qml
++++ b/Services/MediaManager.qml
+@@ -16,10 +16,10 @@ Item {
+     // 核心计算逻辑：优先手动指定 -> 正在播放的 -> 列表第一个 -> null
+     readonly property MprisPlayer active: {
+         if (manualActive)
+-            return manualActive;
++        return manualActive;
+         for (let i = 0; i < list.length; i++) {
+             if (list[i].isPlaying)
+-                return list[i];
++            return list[i];
+         }
+         return list.length > 0 ? list[0] : null;
+     }
+@@ -40,11 +40,11 @@ Item {
+         interval: 250
+         repeat: true
+         triggeredOnStart: true
+-        running: root.active !== null
++        running: root.active !== null && root.active.isPlaying
+         onTriggered: {
+             const player = root.active;
+             if (player && player.positionChanged)
+-                player.positionChanged();
++            player.positionChanged();
+             root.refreshPosition();
+         }
+     }
+@@ -59,6 +59,9 @@ Item {
+         function onLengthChanged() {
+             root.refreshPosition();
+         }
++        function onPlaybackStateChanged() {
++            root.refreshPosition();
++        }
+     }
+
+     // 监听底层状态：如果用户手动指定的播放器被彻底关掉（进程结束），则清空手动状态，让系统重新接管
+diff --git a/Services/ThemeService.qml b/Services/ThemeService.qml
+index 865377c..b0c2eef 100644
+--- a/Services/ThemeService.qml
++++ b/Services/ThemeService.qml
+@@ -185,6 +185,7 @@ Singleton {
+         if (!root.isNiriSession || !PersonalizationConfig.ready)
+             return;
+         root.generateNiriCursorConfig();
++        cursorSyncTimer.restart();
+     }
+
+     function generateNiriCursorConfig() {
+@@ -318,6 +319,31 @@ Singleton {
+
+     onSystemDefaultCursorThemeChanged: root.applyCursorSettings()
+
++    Timer {
++        id: cursorSyncTimer
++        interval: 150
++        onTriggered: {
++            if (cursorSyncProcess.running) {
++                restart();
++                return;
++            }
++            cursorSyncProcess.command = ["python3", Paths.scriptPath("theme", "sync_cursor_settings.py"),
++                                         root.effectiveCursorTheme(), String(
++                                             PersonalizationConfig.cursorSize)];
++            cursorSyncProcess.running = true;
++        }
++    }
++
++    Process {
++        id: cursorSyncProcess
++        stderr: StdioCollector {
++            onStreamFinished: {
++                if (this.text.trim() !== "")
++                console.warn("Cursor settings sync:", this.text.trim());
++            }
++        }
++    }
++
+     Process {
+         id: detectIconThemesProcess
+         stdout: StdioCollector {
+@@ -346,7 +372,7 @@ Singleton {
+     Process {
+         id: generateColorsProcess
+         onRunningChanged: if (running)
+-                              root.generating = true
++        root.generating = true
+         stderr: StdioCollector {
+             id: generationStderr
+         }
+@@ -355,13 +381,13 @@ Singleton {
+                 try {
+                     const status = JSON.parse(data);
+                     if (status.schemaVersion !== 1)
+-                        return;
++                    return;
+                     if (status.event === "core-ready") {
+                         root.coreReloaded = true;
+                         Appearance.reloadColors();
+                     } else if (status.event === "external-error") {
+                         root.externalGenerationError += (root.externalGenerationError ? "\n" : "")
+-                                + status.id + ": " + status.error;
++                        + status.id + ": " + status.error;
+                     } else if (status.event === "core-error") {
+                         root.generationError = status.error;
+                     }
+@@ -374,15 +400,15 @@ Singleton {
+             root.generating = false;
+             root.generationTemplateId = "";
+             if ((exitCode === 0 || exitCode === 3) && !root.coreReloaded)
+-                Appearance.reloadColors();
++            Appearance.reloadColors();
+             if (exitCode !== 0 && exitCode !== 3)
+-                root.generationError = root.generationError || generationStderr.text.trim() || qsTr(
+-                            "Failed to generate Matugen colors");
++            root.generationError = root.generationError || generationStderr.text.trim() || qsTr(
++                "Failed to generate Matugen colors");
+             if (exitCode === 3 && !root.externalGenerationError)
+-                root.externalGenerationError = generationStderr.text.trim() || qsTr(
+-                            "Some Matugen templates failed to generate");
++            root.externalGenerationError = generationStderr.text.trim() || qsTr(
++                "Some Matugen templates failed to generate");
+             if (root.pendingGeneration)
+-                Qt.callLater(root.resumeGeneration);
++            Qt.callLater(root.resumeGeneration);
+         }
+     }
+ }
+diff --git a/Widgets/common/AccountProfileHeader.qml b/Widgets/common/AccountProfileHeader.qml
+index eb82ca6..742a062 100644
+--- a/Widgets/common/AccountProfileHeader.qml
++++ b/Widgets/common/AccountProfileHeader.qml
+@@ -297,7 +297,7 @@ Rectangle {
+                 Text {
+                     text: root.distroLogo()
+                     color: Appearance.colors.colPrimary
+-                    font.family: Fonts.numeric
++                    font.family: Fonts.nerdSymbols
+                     font.pixelSize: 18
+                 }
+
 diff --git a/tests/qml/tst_display_math.qml b/tests/qml/tst_display_math.qml
 index a35ab55..2347547 100644
 --- a/tests/qml/tst_display_math.qml
@@ -406,3 +910,75 @@ index a35ab55..2347547 100644
 +                });
 +    }
  }
+diff --git a/Widgets/common/RectangularShadow.qml b/Widgets/common/RectangularShadow.qml
+new file mode 100644
+index 0000000..2490bf7
+--- /dev/null
++++ b/Widgets/common/RectangularShadow.qml
+@@ -0,0 +1,28 @@
++import QtQuick
++
++Item {
++    id: root
++
++    property real blur: 0
++    property bool cached: false
++    property color color: "transparent"
++    property real radius: 0
++    property real spread: 0
++    property var target
++    property vector2d offset: Qt.vector2d(0, 0)
++
++    visible: opacity > 0 && color.a > 0
++    x: offset.x
++    y: offset.y
++    width: target ? target.width + 2 * spread : 0
++    height: target ? target.height + 2 * spread : 0
++    opacity: color.a
++
++    Rectangle {
++        anchors.fill: parent
++        anchors.margins: -root.spread
++        color: Qt.rgba(root.color.r, root.color.g, root.color.b, 1)
++        radius: root.radius + root.spread
++        opacity: 0.28
++    }
++}
+diff --git a/scripts/theme/sync_cursor_settings.py b/scripts/theme/sync_cursor_settings.py
+new file mode 100644
+index 0000000..5a4c844
+--- /dev/null
++++ b/scripts/theme/sync_cursor_settings.py
+@@ -0,0 +1,32 @@
++#!/usr/bin/env python3
++"""Synchronize client cursor settings with the compositor's selected cursor."""
++import json
++import shutil
++import subprocess
++import sys
++
++
++def sync(theme, size):
++    size = int(size)
++    if not 12 <= size <= 128 or any(char in theme for char in '\n\r\0'):
++        raise ValueError('Invalid cursor theme or size')
++    if shutil.which('gsettings'):
++        settings = [('cursor-size', str(size))]
++        if theme:
++            settings.append(('cursor-theme', json.dumps(theme, ensure_ascii=False)))
++        for key, value in settings:
++            subprocess.run(['gsettings', 'set', 'org.gnome.desktop.interface', key, value],
++                           check=True, timeout=5)
++    if shutil.which('systemctl'):
++        values = [f'XCURSOR_SIZE={size}']
++        if theme:
++            values.append(f'XCURSOR_THEME={theme}')
++        subprocess.run(['systemctl', '--user', 'set-environment', *values], check=True, timeout=5)
++
++
++if __name__ == '__main__':
++    try:
++        sync(*sys.argv[1:])
++    except (ValueError, TypeError, OSError, subprocess.SubprocessError) as error:
++        print(error, file=sys.stderr)
++        sys.exit(1)

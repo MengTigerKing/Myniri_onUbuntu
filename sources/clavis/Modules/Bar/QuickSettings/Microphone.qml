@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.Services
+import qs.Services as Services
 import qs.Common
 import qs.Widgets.common
 
@@ -35,20 +36,22 @@ Item {
                     Layout.preferredHeight: Sizes.barControlCircleSize
                     Layout.alignment: Qt.AlignCenter
 
-                    value: Volume.sourceMuted ? 0 : Volume.sourceVolume
-                    progressColor: (Volume.sourceMuted || Volume.sourceVolume <= 0)
+                    value: Services.Volume.sourceMuted ? 0 : Services.Volume.sourceVolume
+                    progressColor: (Services.Volume.sourceMuted || Services.Volume.sourceVolume <= 0)
                                    ? Appearance.colors.colError : Appearance.colors.colPrimary
                     trackColor: Appearance.colors.colLayer2Hover
                     handleColor: Appearance.colors.colOnSurface
-                    iconColor: (Volume.sourceMuted || Volume.sourceVolume <= 0) ? Appearance.colors.colError :
-                                                                                  Appearance.colors.colOnSurface
-                    icon: (Volume.sourceMuted || Volume.sourceVolume <= 0) ? "mic_off" : "mic"
+                    iconColor: (Services.Volume.sourceMuted || Services.Volume.sourceVolume <= 0)
+                               ? Appearance.colors.colError : Appearance.colors.colOnSurface
+                    icon: (Services.Volume.sourceMuted || Services.Volume.sourceVolume <= 0) ? "mic_off" :
+                                                                                               "mic"
+
                 }
 
                 Text {
                     id: valueText
                     visible: root.showValue
-                    text: Math.round(Volume.sourceVolume * 100) + "%"
+                    text: Math.round(Services.Volume.sourceVolume * 100) + "%"
                     font.family: Fonts.numeric
                     font.pixelSize: 12
                     color: Appearance.colors.colOnSurface
@@ -58,18 +61,6 @@ Item {
         }
         Accessible.name: tooltip.text
 
-        WheelHandler {
-            onWheel: wheel => {
-                const step = 0.05;
-                let newVol = Volume.sourceVolume;
-                if (wheel.angleDelta.y > 0)
-                    newVol += step;
-                else
-                    newVol -= step;
-                Volume.setSourceVolume(newVol);
-                wheel.accepted = true;
-            }
-        }
         onClicked: {
             if (root.screen && root.screen.name)
                 WidgetState.quickSettingsScreenName = root.screen.name;
@@ -82,11 +73,26 @@ Item {
         }
     }
 
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: wheel => {
+                     const delta = wheel.angleDelta.y || wheel.pixelDelta.y;
+                     if (delta === 0) {
+                         wheel.accepted = false;
+                         return;
+                     }
+                     wheel.accepted = Services.Volume.setSourceVolume(Services.Volume.sourceVolume + (delta
+                                                                                                      > 0 ? 0.05 :
+                                                                                                            -0.05));
+                 }
+    }
+
     PopupToolTip {
         id: tooltip
         extraVisibleCondition: mouseArea.pointerHovered
-        text: (Volume.sourceMuted ? qsTr("Microphone: muted") : qsTr("Microphone: ") + Math.round(
-                                        Volume.sourceVolume * 100) + "%") + qsTr(
+        text: (Services.Volume.sourceMuted ? qsTr("Microphone: muted") : qsTr("Microphone: ") + Math.round(
+                                                 Services.Volume.sourceVolume * 100) + "%") + qsTr(
                   "\nScroll to adjust; click to open microphone controls")
     }
 }

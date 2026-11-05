@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+
+def focus_browser():
+    if not shutil.which('niri') or not os.environ.get('NIRI_SOCKET'):
+        return
+    try:
+        result = subprocess.run(['niri', 'msg', '--json', 'windows'],
+                                check=True, capture_output=True, text=True, timeout=2)
+        windows = [window for window in json.loads(result.stdout)
+                   if window.get('app_id') == 'google-chrome']
+        if not windows:
+            return
+        window = next((window for window in windows if window.get('is_focused')), windows[-1])
+        subprocess.run(['niri', 'msg', 'action', 'focus-window', '--id', str(window['id'])],
+                       check=True, capture_output=True, timeout=2)
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        return
+
+
+if __name__ == '__main__':
+    focus_browser()
+    os.execv('/usr/bin/google-chrome-stable', ['google-chrome-stable', *sys.argv[1:]])

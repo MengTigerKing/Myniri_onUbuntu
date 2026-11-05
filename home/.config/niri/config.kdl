@@ -660,3 +660,8 @@ blur {
 include "clavis/hot-corners.kdl";
 
 include "clavis/cursor.kdl";
+
+window-rule {
+    match app-id="^google-chrome$"
+    open-focused true
+}

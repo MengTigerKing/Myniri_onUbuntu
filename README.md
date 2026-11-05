@@ -49,6 +49,11 @@ python3 scripts/deploy.py --apply --install-deps --system
 蓝牙代理使用 Ubuntu 软件源的 Blueman 组件，Niri 中不启动其完整托盘。
 新机安装依赖时会安装 Blueman；当前导出机器使用用户目录中的官方包组件。
 蓝牙配对记录和设备密码不迁移，鼠标、耳机需要在新机器重新配对。
+Ubuntu 运行包的 Quickshell 使用 glibc；用户服务通过 `60-memory.conf` 将分配器 arena 上限设为 4，减少多线程内存碎片。
+媒体暂停或停止时暂停进度定时器，继续通过播放器事件同步切歌和跳转；播放时保持原来的 250ms 刷新。
+以上优化不降低分辨率、刷新率、透明、模糊、动画或侧栏预加载。
+锁屏和账户卡的发行版图标使用包内的 `Symbols Nerd Font Mono`，避免普通文字字体的私用码位冲突。
+VS Code 集成终端可将 `terminal.integrated.fontFamily` 设置为 `"'JetBrains Mono', 'Symbols Nerd Font Mono', monospace"`；部署不覆盖整份 VS Code 设置。
 显示布局计算已统一分数缩放时的像素取整，避免拖动贴边后出现一像素重叠。
 分辨率增大或缩放减小时，仍需在布局图中移动显示器，避免真正的区域重叠。
 未迁移当前机器的显示器专属位置和分辨率，也不启用其 outputs.kdl；新机器登录后自行设置。
@@ -89,6 +94,11 @@ Git 历史或 Python 缓存。完整包同样位于被 Git 忽略的 `artifacts/
 运行包含个人壁纸；对外公开前请确认图片及字体的分发许可，见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
 ## 验证与限制
+
+光标使用 Breeze，默认逻辑尺寸 48。用户主题补齐高分屏图片尺寸，保留原图、动画和热点，
+并通过 `~/.icons/breeze_cursors` 兼容旧版 libXcursor 的搜索路径。Clavis 同步 GTK 与用户服务
+启动环境中的光标设置。已运行的应用可能需要重新打开才能更新光标缓存。
+`scripts/expand-cursor-theme.py` 可从系统 Breeze 重建图片（需要 Pillow）；大尺寸由位图插值生成。
 
 已在当前 Ubuntu 24.04 上验证归档校验、临时目录解压和路径替换、Niri 配置、
 迁移后的 Quickshell/Kitty 版本命令、运行库解析，以及 APT 安装模拟。

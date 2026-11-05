@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.Services
+import qs.Services as Services
 import qs.Common
 import qs.Widgets.common
 
@@ -11,8 +12,8 @@ Item {
     property var screen: null
     property bool vertical: false
     readonly property bool showValue: PersonalizationConfig.barShowValues
-    readonly property var monitor: Brightness.getMonitorForScreen(screen)
-    readonly property real brightnessValue: monitor ? monitor.brightness : Brightness.brightnessValue
+    readonly property var monitor: Services.Brightness.getMonitorForScreen(screen)
+    readonly property real brightnessValue: monitor ? monitor.brightness : Services.Brightness.brightnessValue
 
     implicitWidth: mouseArea.implicitWidth
     implicitHeight: mouseArea.implicitHeight
@@ -57,19 +58,22 @@ Item {
             }
         }
         Accessible.name: tooltip.text
+    }
 
-        WheelHandler {
-            onWheel: wheel => {
-                const step = 0.05;
-                let newBri = root.brightnessValue;
-                if (wheel.angleDelta.y > 0)
-                    newBri += step;
-                else
-                    newBri -= step;
-                Brightness.setBrightnessForScreen(root.screen, newBri);
-                wheel.accepted = true;
-            }
-        }
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: wheel => {
+                     const delta = wheel.angleDelta.y || wheel.pixelDelta.y;
+                     if (delta === 0) {
+                         wheel.accepted = false;
+                         return;
+                     }
+                     Services.Brightness.setBrightnessForScreen(root.screen, root.brightnessValue + (delta
+                                                                                                     > 0 ? 0.05 :
+                                                                                                           -0.05));
+                     wheel.accepted = true;
+                 }
     }
 
     PopupToolTip {

@@ -37,7 +37,7 @@ def prepare(stage, home):
     with tarfile.open(ROOT / 'artifacts/ubuntu24.04-x86_64-runtime.tar.gz') as archive:
         archive.extractall(stage, filter='data')
     target = stage / 'home'
-    shutil.copytree(ROOT / 'home', target, dirs_exist_ok=True)
+    shutil.copytree(ROOT / 'home', target, dirs_exist_ok=True, symlinks=True)
     shutil.copytree(ROOT / 'sources/clavis', target / 'Applications/clavis-source', dirs_exist_ok=True)
     shutil.copytree(ROOT / 'sources/key-cli', target / 'Applications/key-cli', dirs_exist_ok=True)
     for template in (ROOT / 'home').rglob('*'):

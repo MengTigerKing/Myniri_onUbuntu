@@ -16,10 +16,10 @@ Item {
     // 核心计算逻辑：优先手动指定 -> 正在播放的 -> 列表第一个 -> null
     readonly property MprisPlayer active: {
         if (manualActive)
-            return manualActive;
+        return manualActive;
         for (let i = 0; i < list.length; i++) {
             if (list[i].isPlaying)
-                return list[i];
+            return list[i];
         }
         return list.length > 0 ? list[0] : null;
     }
@@ -40,11 +40,11 @@ Item {
         interval: 250
         repeat: true
         triggeredOnStart: true
-        running: root.active !== null
+        running: root.active !== null && root.active.isPlaying
         onTriggered: {
             const player = root.active;
             if (player && player.positionChanged)
-                player.positionChanged();
+            player.positionChanged();
             root.refreshPosition();
         }
     }
@@ -57,6 +57,9 @@ Item {
             root.refreshPosition();
         }
         function onLengthChanged() {
+            root.refreshPosition();
+        }
+        function onPlaybackStateChanged() {
             root.refreshPosition();
         }
     }

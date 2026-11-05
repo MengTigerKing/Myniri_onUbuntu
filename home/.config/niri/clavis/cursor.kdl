@@ -1,5 +1,5 @@
 // Managed by Clavis.
 cursor {
-    xcursor-theme "Yaru";
-    xcursor-size 24;
+    xcursor-theme "breeze_cursors";
+    xcursor-size 48;
 };
